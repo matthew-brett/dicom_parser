@@ -4,7 +4,8 @@ Definition of the :class:`Header` class.
 import json
 from pathlib import Path
 from types import GeneratorType
-from typing import Any, Dict, Iterable, List, Tuple, Union
+from typing import Any, Dict, Iterable, List, Tuple, Union, Optional
+from functools import partial
 
 from pydicom.dataelem import DataElement as PydicomDataElement
 from pydicom.dataset import FileDataset
@@ -322,7 +323,8 @@ class Header:
             raise TypeError(message)
 
     def get_data_element(
-        self, tag_or_keyword: Union[str, tuple, PydicomDataElement]
+        self, tag_or_keyword: Union[str, tuple, PydicomDataElement],
+        vr: Optional[str] = None
     ) -> DataElement:
         """
         Returns a :class:`~dicom_parser.data_element.DataElement` subclass
@@ -332,6 +334,9 @@ class Header:
         ----------
         tag_or_keyword : Union[str, tuple, PydicomDataElement]
             Tag or keyword representing the requested data element
+        vr : None or str, optional
+            Force given value representation if not None, otherwise use read or
+            inferred VR for `tag_or_keyword`.
 
         Returns
         -------
@@ -356,7 +361,8 @@ class Header:
             raise TypeError(message)
         else:
             raw_element = tag_or_keyword
-        DataElementClass = get_data_element_class(raw_element.VR)
+        el_vr = vr if vr is not None else raw_element.VR
+        DataElementClass = get_data_element_class(el_vr)
         data_element = DataElementClass(raw_element)
         # This prevents a circular import but it's far from optimal.
         if data_element.VALUE_REPRESENTATION == ValueRepresentation.SQ:
@@ -436,7 +442,9 @@ class Header:
         element = self.get_raw_element(tag_or_keyword)
         return element.value
 
-    def get_parsed_value(self, tag_or_keyword) -> Any:
+    def get_parsed_value(self, tag_or_keyword,
+                         vr: Optional[str] = None
+    ) -> Any:
         """
         Returns the parsed value of pydicom data element using the this
         class's parser attribute. The data element may be represented by tag
@@ -446,6 +454,9 @@ class Header:
         ----------
         tag_or_keyword : tuple or str
             Tag or keyword representing the requested data element
+        vr : None or str, optional
+            Force given value representation if not None, otherwise use read or
+            inferred VR for `tag_or_keyword`.
 
         Returns
         -------
@@ -453,7 +464,8 @@ class Header:
             Parsed data element value
         """
         try:
-            data_element = self.get_data_element(tag_or_keyword)
+            data_element = self.get_data_element(tag_or_keyword,
+                                                 vr=vr)
         except KeyError as e:
             # Look for method or property.
             try:
@@ -496,6 +508,7 @@ class Header:
         parsed: bool = True,
         missing_ok: bool = True,
         as_json: bool = False,
+        vr: Optional[str] = None
     ) -> Any:
         """
         Returns the value of a pydicom data element, selected by tag (`tuple`)
@@ -520,6 +533,9 @@ class Header:
         as_json : bool, optional
             Whether to return a JSON encoded string of the value, default is
             False
+        vr : None or str, optional
+            Force given value representation if not None, otherwise use read or
+            inferred VR for `tag_or_keyword`.
 
         Returns
         -------
@@ -527,7 +543,8 @@ class Header:
             The requested data element value (or a dict for multiple values)
         """
         # Assignes the required method based on the `parsed` parameter's value
-        get_method = self.get_parsed_value if parsed else self.get_raw_value
+        get_method = (partial(self.get_parsed_value, vr=vr) if parsed
+                      else self.get_raw_value)
 
         # Tries to find a private tags tuple if the given tag_or_keyword is a
         # keyword that has been registered in the private_tags module
@@ -786,6 +803,8 @@ class Header:
         GeneratorType
             Header information data elements
         """
+        # Elements where we need to force the VR will give different output
+        # here than from get_data_element with explicit VR.
         for element in self.raw:
             if element.tag != ("7fe0", "0010"):
                 yield self.get_data_element(element)

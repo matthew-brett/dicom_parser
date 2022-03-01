@@ -25,7 +25,7 @@ from dicom_parser.utils.siemens.private_tags import (
 class Image:
     """
     This class represents a single DICOM image (i.e. `.dcm` file) and provides
-    unified access to it's header information and data.
+    unified access to its header information and data.
     """
 
     #: Keeps a cached reference to an initialized Mosaic instance.

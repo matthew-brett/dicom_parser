@@ -39,7 +39,8 @@ class Mosaic:
 
         # Read series CSA header (contains information about the mosaic
         # dimensions).
-        self.series_header_info = self.header.get(self.CSA_SERIES_INFO_KEY)
+        self.series_header_info = self.header.get(self.CSA_SERIES_INFO_KEY,
+                                                  vr='UN')
 
         # Number of images encoded in the mosaic.
         self.n_images = self.get_n_images()
